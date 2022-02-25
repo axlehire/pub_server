@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:convert' as convert;
+import 'dart:typed_data';
 
 import 'package:http_parser/http_parser.dart';
 import 'package:logging/logging.dart';
@@ -374,7 +375,7 @@ class ShelfPubServer {
     MimeMultipart? thePart;
 
     await for (MimeMultipart part
-        in stream.transform(MimeMultipartTransformer(boundary))) {
+        in stream.transform(InternalMimeMultipartTransformer(boundary))) {
       // If we get more than one part, we'll ignore the rest of the input.
       if (thePart != null) {
         continue;
@@ -531,4 +532,18 @@ String? _getBoundary(String contentType) {
     return mediaType.parameters['boundary'];
   }
   return null;
+}
+
+/// Parser for MIME multipart types of data as described in RFC 2046
+/// section 5.1.1. The data is transformed into [MimeMultipart] objects, each
+/// of them streaming the multipart data.
+class InternalMimeMultipartTransformer
+    extends StreamTransformerBase<Uint8List, MimeMultipart> {
+  final MimeMultipartTransformer _transformer;
+
+  InternalMimeMultipartTransformer(String boundary): _transformer = MimeMultipartTransformer(boundary);
+
+  @override
+  Stream<MimeMultipart> bind(Stream<Uint8List> stream) =>
+      _transformer.bind(stream.map((event) => List.from(event)));
 }

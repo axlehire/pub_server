@@ -33,7 +33,7 @@ class HttpProxyRepository extends PackageRepository {
     }
 
     var json = convert.json.decode(response.body);
-    var versions = json['versions'] as List<dynamic>;
+    var versions = json['versions'] as List<dynamic>?;
     if (versions != null) {
       for (var item in versions) {
         var pubspec = item['pubspec'];
@@ -48,7 +48,7 @@ class HttpProxyRepository extends PackageRepository {
   // just talk to the HTTP endpoint which gives us a specific package/version
   // combination.
   @override
-  Future<PackageVersion> lookupVersion(String package, String version) {
+  Future<PackageVersion?> lookupVersion(String package, String? version) {
     return versions(package)
         .where((v) => v.packageName == package && v.versionString == version)
         .toList()
@@ -75,10 +75,10 @@ class HttpProxyRepository extends PackageRepository {
   }
 
   @override
-  Future<Stream<List<int>>> download(String package, String version) async {
+  Future<Stream<List<int>>> download(String package, String? version) async {
     _logger.info('Downloading package $package/$version.');
 
-    var url = await downloadUrl(package, version);
+    var url = await downloadUrl(package, version!);
     var response = await client.send(http.Request('GET', url));
     return response.stream;
   }

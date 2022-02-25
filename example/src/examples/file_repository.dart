@@ -16,27 +16,28 @@ final Logger _logger = Logger('pub_server.file_repository');
 
 /// Implements the [PackageRepository] by storing pub packages on a file system.
 class FileRepository extends PackageRepository {
-  final String baseDir;
+  final String? baseDir;
 
   FileRepository(this.baseDir);
 
   @override
   Stream<PackageVersion> versions(String package) {
-    var directory = Directory(p.join(baseDir, package));
+    var directory = Directory(p.join(baseDir!, package));
     if (directory.existsSync()) {
-      return directory
-          .list(recursive: false)
-          .where((fse) => fse is Directory)
-          .map((dir) {
-        var version = p.basename(dir.path);
+      return directory.list(recursive: false).where((fse) {
+        final isDirectory = fse is Directory;
+        var version = p.basename(fse.path);
         var pubspecFile = File(pubspecFilePath(package, version));
         var tarballFile = File(packageTarballPath(package, version));
-        if (pubspecFile.existsSync() && tarballFile.existsSync()) {
-          var pubspec = pubspecFile.readAsStringSync();
-          return PackageVersion(package, version, pubspec);
-        }
-        return null;
-      }).where((e) => e != null);
+        return isDirectory &&
+            pubspecFile.existsSync() &&
+            tarballFile.existsSync();
+      }).map((dir) {
+        var version = p.basename(dir.path);
+        var pubspecFile = File(pubspecFilePath(package, version));
+        var pubspec = pubspecFile.readAsStringSync();
+        return PackageVersion(package, version, pubspec);
+      });
     }
 
     return Stream.fromIterable([]);
@@ -45,12 +46,12 @@ class FileRepository extends PackageRepository {
   // TODO: Could be optimized by searching for the exact package/version
   // combination instead of enumerating all.
   @override
-  Future<PackageVersion> lookupVersion(String package, String version) {
+  Future<PackageVersion?> lookupVersion(String package, String? version) {
     return versions(package)
         .where((pv) => pv.versionString == version)
         .toList()
-        .then((List<PackageVersion> versions) {
-      if (versions.isNotEmpty) return versions.first;
+        .then((List<PackageVersion?> versions) {
+      if (versions.isNotEmpty) return versions.first!;
       return null;
     });
   }
@@ -59,14 +60,14 @@ class FileRepository extends PackageRepository {
   bool get supportsUpload => true;
 
   @override
-  Future<PackageVersion> upload(Stream<List<int>> data) async {
+  Future<PackageVersion> upload(Stream<List<int>>? data) async {
     _logger.info('Start uploading package.');
-    var bb = await data.fold(
+    var bb = await data!.fold(
         BytesBuilder(), (BytesBuilder byteBuilder, d) => byteBuilder..add(d));
     var tarballBytes = bb.takeBytes();
     var tarBytes = GZipDecoder().decodeBytes(tarballBytes);
     var archive = TarDecoder().decodeBytes(tarBytes);
-    ArchiveFile pubspecArchiveFile;
+    ArchiveFile? pubspecArchiveFile;
     for (var file in archive.files) {
       if (file.name == 'pubspec.yaml') {
         pubspecArchiveFile = file;
@@ -79,12 +80,12 @@ class FileRepository extends PackageRepository {
     }
 
     // TODO: Error handling.
-    var pubspec = loadYaml(convert.utf8.decode(_getBytes(pubspecArchiveFile)));
+    var pubspec = loadYaml(convert.utf8.decode(_getBytes(pubspecArchiveFile)!));
 
     var package = pubspec['name'] as String;
     var version = pubspec['version'] as String;
 
-    var packageVersionDir = Directory(p.join(baseDir, package, version));
+    var packageVersionDir = Directory(p.join(baseDir!, package, version));
 
     if (!packageVersionDir.existsSync()) {
       packageVersionDir.createSync(recursive: true);
@@ -95,7 +96,7 @@ class FileRepository extends PackageRepository {
       throw StateError('`$package` already exists at version `$version`.');
     }
 
-    var pubspecContent = convert.utf8.decode(_getBytes(pubspecArchiveFile));
+    var pubspecContent = convert.utf8.decode(_getBytes(pubspecArchiveFile)!);
     pubspecFile.writeAsStringSync(pubspecContent);
     File(packageTarballPath(package, version)).writeAsBytesSync(tarballBytes);
 
@@ -108,7 +109,7 @@ class FileRepository extends PackageRepository {
   bool get supportsDownloadUrl => false;
 
   @override
-  Future<Stream<List<int>>> download(String package, String version) async {
+  Future<Stream<List<int>>> download(String package, String? version) async {
     var pubspecFile = File(pubspecFilePath(package, version));
     var tarballFile = File(packageTarballPath(package, version));
 
@@ -119,13 +120,13 @@ class FileRepository extends PackageRepository {
     }
   }
 
-  String pubspecFilePath(String package, String version) =>
-      p.join(baseDir, package, version, 'pubspec.yaml');
+  String pubspecFilePath(String? package, String? version) =>
+      p.join(baseDir!, package, version, 'pubspec.yaml');
 
-  String packageTarballPath(String package, String version) =>
-      p.join(baseDir, package, version, 'package.tar.gz');
+  String packageTarballPath(String? package, String? version) =>
+      p.join(baseDir!, package, version, 'package.tar.gz');
 }
 
 // Since pkg/archive v1.0.31, content is `dynamic` although in our use case
 // it's always `List<int>`
-List<int> _getBytes(ArchiveFile file) => file.content as List<int>;
+List<int>? _getBytes(ArchiveFile file) => file.content as List<int>?;

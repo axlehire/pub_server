@@ -21,10 +21,10 @@ void main(List<String> args) {
   var parser = argsParser();
   var results = parser.parse(args);
 
-  var directory = results['directory'] as String;
-  var host = results['host'] as String;
+  var directory = results['directory'] as String?;
+  var host = results['host'] as String?;
   var port = int.parse(results['port'] as String);
-  var standalone = results['standalone'] as bool;
+  var standalone = results['standalone'] as bool?;
 
   if (results.rest.isNotEmpty) {
     print('Got unexpected arguments: "${results.rest.join(' ')}".\n\nUsage:\n');
@@ -37,7 +37,7 @@ void main(List<String> args) {
 }
 
 Future<HttpServer> runPubServer(
-    String baseDir, String host, int port, bool standalone) {
+    String? baseDir, String? host, int port, bool? standalone) {
   var client = http.Client();
 
   var local = FileRepository(baseDir);

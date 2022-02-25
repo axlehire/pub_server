@@ -25,13 +25,13 @@ class CopyAndWriteRepository extends PackageRepository {
   final PackageRepository remote;
   final _RemoteMetadataCache _localCache;
   final _RemoteMetadataCache _remoteCache;
-  final bool standalone;
+  final bool? standalone;
 
   /// Construct a new proxy with [local] as the local [PackageRepository] which
   /// is used for uploading new package versions to and [remote] as the
   /// read-only [PackageRepository] which is consulted on misses in [local].
   CopyAndWriteRepository(
-      PackageRepository local, PackageRepository remote, bool standalone)
+      PackageRepository local, PackageRepository remote, bool? standalone)
       : local = local,
         remote = remote,
         standalone = standalone,
@@ -40,11 +40,11 @@ class CopyAndWriteRepository extends PackageRepository {
 
   @override
   Stream<PackageVersion> versions(String package) {
-    StreamController<PackageVersion> controller;
+    late StreamController<PackageVersion> controller;
     void onListen() {
-      var waitList = [_localCache.fetchVersionlist(package)];
+      var waitList = [_localCache.fetchVersionList(package)];
       if (standalone != true) {
-        waitList.add(_remoteCache.fetchVersionlist(package));
+        waitList.add(_remoteCache.fetchVersionList(package));
       }
       Future.wait(waitList).then((tuple) {
         var versions = <PackageVersion>{}..addAll(tuple[0]);
@@ -63,12 +63,12 @@ class CopyAndWriteRepository extends PackageRepository {
   }
 
   @override
-  Future<PackageVersion> lookupVersion(String package, String version) {
+  Future<PackageVersion?> lookupVersion(String package, String? version) {
     return versions(package)
         .where((pv) => pv.versionString == version)
         .toList()
-        .then((List<PackageVersion> versions) {
-      if (versions.isNotEmpty) return versions.first;
+        .then((List<PackageVersion?> versions) {
+      if (versions.isNotEmpty) return versions.first!;
       return null;
     });
   }
@@ -121,21 +121,21 @@ class CopyAndWriteRepository extends PackageRepository {
 class _RemoteMetadataCache {
   final PackageRepository remote;
 
-  final Map<String, Set<PackageVersion>> _versions = {};
+  final Map<String?, Set<PackageVersion>> _versions = {};
   final Map<String, Completer<Set<PackageVersion>>> _versionCompleters = {};
 
   _RemoteMetadataCache(this.remote);
 
   // TODO: After a cache expiration we should invalidate entries and re-fetch
   // them.
-  Future<List<PackageVersion>> fetchVersionlist(String package) {
+  Future<List<PackageVersion>> fetchVersionList(String package) {
     return _versionCompleters
         .putIfAbsent(package, () {
           var c = Completer<Set<PackageVersion>>();
 
           _versions.putIfAbsent(package, () => <PackageVersion>{});
           remote.versions(package).toList().then((versions) {
-            _versions[package].addAll(versions);
+            _versions[package]!.addAll(versions);
             c.complete(_versions[package]);
           });
 

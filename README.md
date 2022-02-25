@@ -27,7 +27,7 @@ available packages, available only locally.
 
 It can be run as follows
 ```
-~ $ git clone https://github.com/dart-lang/pub_server.git
+~ $ git clone https://github.com/axlehire/pub_server.git
 ~ $ cd pub_server
 ~/pub_server $ pub get
 ...
